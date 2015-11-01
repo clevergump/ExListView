@@ -2,33 +2,62 @@ package sample.byhook.exlistview;
 
 import android.app.Activity;
 import android.os.Bundle;
+import android.os.Handler;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.ArrayAdapter;
+import android.widget.Toast;
 
-public class MainActivity extends Activity {
+import java.util.ArrayList;
+import java.util.List;
+
+import lib.byhook.impl.PullDownImpl;
+import lib.byhook.lv.ExListView;
+
+public class MainActivity extends Activity implements PullDownImpl {
+
+    private ExListView lv_home_ex;
+
+	private List<String> exStr;
+
+	private ArrayAdapter<String> adapter;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
-	}
 
-	@Override
-	public boolean onCreateOptionsMenu(Menu menu) {
-		// Inflate the menu; this adds items to the action bar if it is present.
-		getMenuInflater().inflate(R.menu.main, menu);
-		return true;
-	}
+		lv_home_ex = (ExListView) findViewById(R.id.lv_home_ex);
 
-	@Override
-	public boolean onOptionsItemSelected(MenuItem item) {
-		// Handle action bar item clicks here. The action bar will
-		// automatically handle clicks on the Home/Up button, so long
-		// as you specify a parent activity in AndroidManifest.xml.
-		int id = item.getItemId();
-		if (id == R.id.action_settings) {
-			return true;
+		exStr = new ArrayList<String>();
+		for(int i=0;i<15;i++){
+			exStr.add(""+i);
 		}
-		return super.onOptionsItemSelected(item);
+
+		adapter  = new ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,exStr);
+		lv_home_ex.setAdapter(adapter);
+
+		lv_home_ex.setOnPullDownListener(this);
+
+	}
+
+	public void onPullUp() {
+		Toast.makeText(this,"PullUp",Toast.LENGTH_SHORT).show();
+	}
+
+	@Override
+	public void onPullDown() {
+		Handler handler = new Handler();
+		handler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+				for (int i = 0; i<3;i++){
+					exStr.add(0,""+i);
+				}
+				adapter.notifyDataSetChanged();
+				lv_home_ex.setPullDownComplete("更新完成");
+			}
+		},3000);
+
 	}
 }
