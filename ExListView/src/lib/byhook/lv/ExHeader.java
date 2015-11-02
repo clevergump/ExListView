@@ -3,8 +3,10 @@ package lib.byhook.lv;
 import android.content.Context;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.animation.LinearInterpolator;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -98,33 +100,33 @@ public class ExHeader extends LinearLayout {
         mScroller = new Scroller(getContext(), new LinearInterpolator());  //OvershootInterpolator(0.75f)
 
 
-        mDefaultHeight = 160;
         setExHeight(0);
+    }
+
+    /**
+     * 是否允许下拉事件
+     * @return
+     */
+    public boolean allow(){
+        return mPullDownImpl != null;
     }
 
     /**
      * 初始化Header
      */
-    public void initHeader(){
+    public void initHeader(int width,int height){
+        //计算头部高度
+        mDefaultHeight = height/10;
+        LinearLayout.LayoutParams lpHeader = (LayoutParams) header.getLayoutParams();
+        lpHeader.height = mDefaultHeight;
+        header.setLayoutParams(lpHeader);
+
         //初始化Logo相对坐标
         iv_logo = (ImageView) findViewById(R.id.iv_logo);
-        int marginLeft = getDisplayWidth()/6;
-        RelativeLayout.LayoutParams lp = (RelativeLayout.LayoutParams) iv_logo.getLayoutParams();
-        lp.setMargins(marginLeft, 0, 0, 0);
-        iv_logo.setLayoutParams(lp);
-
-    }
-
-    /**
-     * 获取默认屏幕宽度
-     * @return
-     */
-    private int getDisplayWidth(){
-        WindowManager windowManager = (WindowManager) getContext().getSystemService(
-                Context.WINDOW_SERVICE);
-        DisplayMetrics outMetrics = new DisplayMetrics();
-        windowManager.getDefaultDisplay().getMetrics(outMetrics);
-        return outMetrics.widthPixels;
+        int marginLeft = width/6;
+        RelativeLayout.LayoutParams lpLogo = (RelativeLayout.LayoutParams) iv_logo.getLayoutParams();
+        lpLogo.setMargins(marginLeft, 0, 0, 0);
+        iv_logo.setLayoutParams(lpLogo);
     }
 
     /**
@@ -154,13 +156,6 @@ public class ExHeader extends LinearLayout {
         container.setLayoutParams(lp);
     }
 
-    /**
-     * 获取高度
-     * @return 容器高度
-     */
-    public int getExHeight(){
-        return  container.getHeight();
-    }
 
     /**
      * 回弹设置高度
@@ -171,9 +166,11 @@ public class ExHeader extends LinearLayout {
         lp.height = height;
         if(mScroller.isFinished()){
             if(lp.height<=0){
-                mPullType = PullType.PULL_IDLE;
                 lp.height = 0;
-            }else if(mPullDownImpl!=null){   //lp.height==mDefaultHeight &&
+                if(mPullType == PullType.PULL_COMPLETE){
+                    mPullType = PullType.PULL_IDLE;
+                }
+            }else if(mPullDownImpl!=null && mPullType != PullType.PULL_LOADING){
                 //正在加载数据
                 mPullType = PullType.PULL_LOADING;
                 mPullDownImpl.onPullDown();
@@ -186,11 +183,13 @@ public class ExHeader extends LinearLayout {
      * 回滚Header位置
      */
     public void resetHeader() {
-        int from = getExHeight();
+        int from = getHeight();
         int to = -from;
         if(mPullType==PullType.PULL_DOWN || mPullType==PullType.PULL_LOADING){
             //正在更新
-            to += mDefaultHeight;
+            if(from>=mDefaultHeight){
+                to += mDefaultHeight;
+            }
             tv_content.setText(R.string.header_content_loading);
         }
         mScroller.startScroll(0, from, 0, to, 100);
@@ -206,15 +205,14 @@ public class ExHeader extends LinearLayout {
         mPullType = PullType.PULL_COMPLETE;
         tv_content.setText(str);
 
-        if(!mOnTouching){
-            postDelayed(new Runnable() {
-                @Override
-                public void run() {
+        postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!mOnTouching) {
                     resetHeader();
                 }
-            },500);
-        }
-
+            }
+        },500);
     }
 
     /**

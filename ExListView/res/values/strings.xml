@@ -3,5 +3,9 @@
     <string name="app_name">ExListView</string>
     <string name="header_content_ready">下拉刷新</string>
     <string name="header_content_pulldown">释放立即刷新</string>
-    <string name="header_content_loading">正在刷新</string>
+    <string name="header_content_loading">正在刷新...</string>
+
+    <string name="footer_content_loading">正在加载...</string>
+    <string name="footer_content_more">更多</string>
+
 </resources>

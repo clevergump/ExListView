@@ -12,9 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import lib.byhook.impl.PullDownImpl;
+import lib.byhook.impl.PullMoreImpl;
 import lib.byhook.lv.ExListView;
 
-public class MainActivity extends Activity implements PullDownImpl {
+public class MainActivity extends Activity implements PullDownImpl, PullMoreImpl {
 
     private ExListView lv_home_ex;
 
@@ -30,7 +31,7 @@ public class MainActivity extends Activity implements PullDownImpl {
 		lv_home_ex = (ExListView) findViewById(R.id.lv_home_ex);
 
 		exStr = new ArrayList<String>();
-		for(int i=0;i<15;i++){
+		for(int i=0;i<7;i++){
 			exStr.add(""+i);
 		}
 
@@ -38,6 +39,7 @@ public class MainActivity extends Activity implements PullDownImpl {
 		lv_home_ex.setAdapter(adapter);
 
 		lv_home_ex.setOnPullDownListener(this);
+		lv_home_ex.setOnPullMoreListener(this);
 
 	}
 
@@ -55,9 +57,23 @@ public class MainActivity extends Activity implements PullDownImpl {
 					exStr.add(0,""+i);
 				}
 				adapter.notifyDataSetChanged();
-				lv_home_ex.setPullDownComplete("更新完成");
+                lv_home_ex.setPullDownComplete("加载完成");
+			}
+		},1000);
+	}
+
+	@Override
+	public void onPullMore() {
+		Handler handler = new Handler();
+		handler.postDelayed(new Runnable() {
+			@Override
+			public void run() {
+//				for (int i = 0; i<5;i++){
+//					exStr.add("II"+i);
+//				}
+//				adapter.notifyDataSetChanged();
+				lv_home_ex.setPullMoreComplete();
 			}
 		},3000);
-
 	}
 }

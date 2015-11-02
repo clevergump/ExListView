@@ -1,18 +1,15 @@
 package lib.byhook.lv;
 
-import android.annotation.TargetApi;
 import android.content.Context;
-import android.os.Build;
+import android.database.DataSetObserver;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.MotionEvent;
-import android.view.VelocityTracker;
 import android.view.View;
-import android.view.animation.LinearInterpolator;
-import android.widget.AbsListView;
+import android.view.WindowManager;
 import android.widget.ListAdapter;
 import android.widget.ListView;
-import android.widget.Scroller;
 
 import lib.byhook.impl.PullDownImpl;
 import lib.byhook.impl.PullMoreImpl;
@@ -66,15 +63,14 @@ public class ExListView extends ListView {
     private int mItemCount;
 
     /**
-     * 下拉接口
+     * 数据监听器
      */
-    private PullDownImpl mPullDownImpl;
+    private DataNotify mDataNotify;
 
     /**
-     * 上拉接口
+     * 加载更多
      */
-    private PullMoreImpl mPullMoreImpl;
-
+    private boolean pullMore;
 
     public ExListView(Context context) {
         super(context);
@@ -98,12 +94,33 @@ public class ExListView extends ListView {
         exHeader = new ExHeader(getContext());
         addHeaderView(exHeader);
         exHeader.setVisibility(View.GONE);
-        exHeader.initHeader();
+        exHeader.initHeader(getDisplayWidth(),getDisplayHeight());
 
 
         exFooter = new ExFooter(getContext());
         addFooterView(exFooter);
         exFooter.setVisibility(View.GONE);
+        exFooter.initFooter(getDisplayWidth(),getDisplayHeight());
+    }
+
+    /**
+     * 获取默认屏幕宽度
+     * @return
+     */
+    private DisplayMetrics getDisplayMetrics(){
+        WindowManager windowManager = (WindowManager) getContext().getSystemService(
+                Context.WINDOW_SERVICE);
+        DisplayMetrics outMetrics = new DisplayMetrics();
+        windowManager.getDefaultDisplay().getMetrics(outMetrics);
+        return outMetrics;
+    }
+
+    private int getDisplayWidth(){
+        return  getDisplayMetrics().widthPixels;
+    }
+
+    private int getDisplayHeight(){
+        return getDisplayMetrics().heightPixels;
     }
 
     /**
@@ -127,14 +144,28 @@ public class ExListView extends ListView {
     @Override
     public void setAdapter(ListAdapter adapter) {
         super.setAdapter(adapter);
-        this.mItemCount = adapter.getCount();
+        this.mItemCount = adapter.getCount()+1+1;  //Header + Footer
+        this.mDataNotify = new DataNotify();
+        adapter.registerDataSetObserver(mDataNotify);
+    }
+
+    /**
+     * 销毁窗口
+     */
+    @Override
+    protected void onDetachedFromWindow() {
+        if(mDataNotify!=null){
+            getAdapter().unregisterDataSetObserver(mDataNotify);
+            mDataNotify = null;
+        }
+        super.onDetachedFromWindow();
     }
 
     /**
      * 是否在最顶部
      * @return
      */
-    private boolean isOnTop(){
+    private boolean isOnHeader(){
         return getFirstVisiblePosition()==0;
     }
 
@@ -142,8 +173,8 @@ public class ExListView extends ListView {
      * 是否在最底部
      * @return
      */
-    private boolean isOnBottom(){
-        return getLastVisiblePosition()==mItemCount+1;
+    private boolean isOnFooter(){
+        return getLastVisiblePosition()==mItemCount-1;
     }
 
     /**
@@ -156,6 +187,10 @@ public class ExListView extends ListView {
     @Override
     protected void onOverScrolled(int scrollX, int scrollY, boolean clampedX, boolean clampedY) {
         //super.onOverScrolled(scrollX*5, scrollY*5, clampedX, clampedY);
+        if(exFooter.allow() && (clampedY && scrollY>0) || pullMore){
+            if(DEBUG) Log.d(TAG,"Ex...onOverScrolled");
+            exFooter.pullMore();
+        }
     }
 
     /**
@@ -203,7 +238,12 @@ public class ExListView extends ListView {
                 }
                 break;
             case MotionEvent.ACTION_DOWN:
+                //头部不许回调
                 exHeader.setOnTouching(true);
+
+                //初始化Footer是否显示
+                initFooter();
+
                 mYPoint = (int) ev.getY();
                 mActivePointerId = ev.getPointerId(0);
                 break;
@@ -217,33 +257,37 @@ public class ExListView extends ListView {
                 float deltaY = (pointY - mYPoint);
                 mYPoint = pointY;
 
-                if(isOnTop()){
+                if (isOnHeader()) {
                     //位于最顶部
-                    if(deltaY>0 || exHeader.getExHeight()>0) {
+                    if (exHeader.allow() && (deltaY > 0 || exHeader.getHeight() > 0)) {
                         deltaY *= ELASTICITY_COEFFICIENT;
                         //smoothScrollBy(0, (int) deltaY);
                         exHeader.setExHeight((int) deltaY);
                         setSelection(0);
                     }
-                }else{
-                    //最顶部消失
-                    if(exFooter.getVisibility()!=View.VISIBLE){
-                        exFooter.setVisibility(View.VISIBLE);
-                        if(DEBUG) Log.w(TAG,"Footer...Visible");
-                    }else if(isOnBottom() && deltaY<0){
-                        //if(DEBUG) Log.w(TAG,"Footer...Pull");
+                } else if (isOnFooter()) {
+                    if(exFooter.allow()){
+                        pullMore = true;
                     }
+                } else {
+                    pullMore = false;
                 }
                 break;
             case MotionEvent.ACTION_UP:
                 exHeader.setOnTouching(false);
                 mActivePointerId = INVALID_POINTER;
-                if(exHeader.getExHeight()>0){
+                if(exHeader.allow() && exHeader.getHeight()>0){
                     exHeader.resetHeader();
                 }
                 break;
         }
         return super.onTouchEvent(ev);
+    }
+
+    private void initFooter(){
+        if(exFooter.allow() && mItemCount-2>getLastVisiblePosition()-getFirstVisiblePosition()){
+            exFooter.showFooter();
+        }
     }
 
     /**
@@ -252,20 +296,38 @@ public class ExListView extends ListView {
     public void setOnPullDownListener(PullDownImpl mPullDownImpl){
         this.exHeader.setVisibility(View.VISIBLE);
         this.exHeader.setOnPullDownListener(mPullDownImpl);
-        this.mPullDownImpl = mPullDownImpl;
     }
 
     public void setPullDownComplete(CharSequence str){
+        this.mItemCount = getAdapter().getCount();
         this.exHeader.setComplete(str);
     }
 
     /**
      * 监听上拉事件
      */
-    public void setOnPullUpListener(PullMoreImpl mPullMoreImpl){
+    public void setOnPullMoreListener(PullMoreImpl mPullMoreImpl){
         this.exFooter.setVisibility(View.VISIBLE);
-        this.mPullMoreImpl = mPullMoreImpl;
+        this.exFooter.setOnPullMoreListener(mPullMoreImpl);
     }
 
+    /**
+     * 加载更多完成
+     */
+    public void setPullMoreComplete(){
+        this.mItemCount = getAdapter().getCount();
+        this.exFooter.setComplete();
+    }
+
+    /**
+     * 数据更新监听
+     */
+    private class DataNotify extends DataSetObserver{
+        @Override
+        public void onChanged() {
+            super.onChanged();
+
+        }
+    }
 
 }
