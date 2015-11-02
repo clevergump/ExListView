@@ -202,6 +202,13 @@ public class ExListView extends ListView {
     public boolean onInterceptTouchEvent(MotionEvent ev) {
         switch (ev.getAction()) {
             case MotionEvent.ACTION_DOWN:
+
+                //头部不许回调
+                exHeader.setOnTouching(true);
+
+                //初始化Footer是否显示
+                initFooter();
+
                 mXPoint = ev.getX();
                 mYPoint = ev.getY();
                 mActivePointerId = ev.getPointerId(0);
