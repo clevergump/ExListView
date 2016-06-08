@@ -3,7 +3,6 @@ apply plugin: 'com.android.application'
 dependencies {
     compile fileTree(include: '*.jar', dir: 'libs')
     compile project(':ExListView')
-    compile project(':ExListView')
 }
 
 android {
